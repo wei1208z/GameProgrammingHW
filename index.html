@@ -3,26 +3,62 @@
 <head>
 <title>Game Programming HW</title>
 <style>
+
+.toggle{
+             position: absolute;
+             top: 20px;
+             right: 50px;
+             width: 40px;
+             height: 20px;
+             border: 2px solid black;
+             border-radius: 20px;
+             cursor: pointer;
+             transition: all 3s;
+         }
+         .day{
+           
+             position: absolute;
+             top: 1.5px;
+             left: 2px;
+             height: 13px;
+             width: 13px;
+             background-color: black;
+             border-radius: 50%;
+             transition: all 0.1s;
+         }
+        .night{
+           
+             position: absolute;
+             top: 1.5px;
+             right: 2px;
+             height: 13px;
+             width: 13px;
+             background-color: white;
+             border-radius: 50%;
+             transition: all 0.1s;
+         }	
+
+
 #title{
 	text-align: center;
 	font-size: 50px;
 	width: 740px;
 	margin:auto;
-	color: #FFFF37;
+	color: #000000;
 }
 #context{
 	text-align: center;
 	font-size 30px;
 	width: 600px;
 	margin: auto;
-	color: #FFFF37;
+	color: #000000;
 }
 #hw_table{
 	text-align: center;
 	width:auto;
 	margin:	auto;
 	border:5px #FFFFFF solid;	
-	color: #FFFF37;
+	color: #0000C6;
 }
 #picture{
 	align: center;
@@ -30,11 +66,40 @@
 	height: 220px;
 }
 body{
-	background: #000000;
+	background: 	#CA8EFF;
     }
 </style>
 </head>
-<body>
+<body id="body">
+
+    <div class="toggle" >
+        <div class="day" id="button"></div>
+    </div>
+
+
+<script>
+  var mode=true;
+  var button =document.getElementById('button');
+  var toggle = document.querySelector('.toggle');
+  var body = document.getElementById('body');
+
+  button.addEventListener('click',function(){
+    if(mode){
+      this.className = 'night';
+      mode=false;
+      toggle.style. border= '2px solid  white';
+      body.style. backgroundColor= '#005757';
+      body.style.color = 'white';
+      }
+    else{
+      this.className = 'day';
+      mode=true;
+      toggle.style. border= '2px solid black';
+      body.style. backgroundColor= '#CA8EFF';
+      body.style.color = 'black';
+   }})
+  </script>
+
 <h1 id = "title">Game Programming HW</h1>
 <h1 id = "context">大同大學資工系 </h1>
 <h1 id = "context">黃暐哲 410806150</h1>
@@ -47,7 +112,7 @@ body{
 	
 </tr>
 <tr>
-	<td><img id = "picture" src="https://wei1208z.github.io/GameProgrammingHW/temp.jfjf"></td>
+	<td><a href="https://wei1208z.github.io/GameProgrammingHW/hw0/hw0.html"><img id="picture" src="https://wei1208z.github.io/GameProgrammingHW//hw0/hw0.gif"></a></td>
 </tr>
 
 </table>
