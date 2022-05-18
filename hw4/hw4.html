@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#info
+{
+  position: absolute;
+  top: 10px;
+  width: 100%;
+  padding: 5px;
+  text-align: center;
+  font-size:20px;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+
+<body>
+<div id="info">HW4  <br>
+
+</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://threejs.org/examples/js/misc/Gyroscope.js"></script>
+<script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/MTLLoader.js"></script>
+  <script src="https://raw.githack.com/mrdoob/three.js/dev/examples/js/loaders/OBJLoader.js"></script>
+
+<script src="./Agent.js"></script>
+<script src="./Buildman.js"></script>
+
+<script>
+var theObject;
+
+var mouseX = 0,
+  mouseY = 0;
+
+var windowHalfX = window.innerWidth / 2;
+var windowHalfY = window.innerHeight / 2;
+var controls;
+var bs;
+var modelName;
+var theModel;
+////////////////////
+var camera, scene, renderer, clock;
+var raycaster;
+var mouse = new THREE.Vector2();
+var pickables = [];
+var agent;
+var targetMesh;
+var bus;
+var clock = new THREE.Clock();
+var ts = clock.getElapsedTime();
+var WW=4,HH=12;
+var count=0;
+
+init();
+animate();
+
+
+function init() {
+
+  clock = new THREE.Clock();
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 10, 1000);
+  camera.position.z = 120;
+  camera.position.y = 200;
+
+  //var gridXZ = new THREE.GridHelper(300, 30, 'red', 'white');
+  //scene.add(gridXZ);
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),new THREE.MeshPhongMaterial({color: 0x696969,shininess: 10,side:THREE.DoubleSide,}))
+  floor.rotation.x = -Math.PI/2;
+  scene.add(floor);
+  pickables = [floor];
+
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  document.body.appendChild(renderer.domElement);
+
+  /////////////////////////////////////////////////////////////////////
+  let loader = new THREE.TextureLoader();
+  let tex = loader.load ("https://i.imgur.com/GmthNU8.png");
+  targetMesh = new THREE.Mesh(new THREE.CircleGeometry(10,20), new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent:true
+   }));
+  scene.add(targetMesh);
+  targetMesh.rotation.x = -Math.PI/2
+
+  raycaster = new THREE.Raycaster();
+  document.addEventListener('pointerdown', onDocumentMouseDown, false);
+  ////////////////////////
+  readModel('bus');
+  var ambientLight = new THREE.AmbientLight(0xffffff);
+  scene.add(ambientLight);
+  const directionalLight = new THREE.DirectionalLight( 0xffffff);
+  scene.add( directionalLight );
+  man=new man();
+  man.buildman(WW,HH);
+}
+
+function readModel (modelName, targetSize=150) {
+
+  var onProgress = function(xhr) {
+    if (xhr.lengthComputable) {
+      var percentComplete = xhr.loaded / xhr.total * 100;
+      console.log(Math.round(percentComplete, 2) + '% downloaded');
+    }
+  };
+
+  var onError = function(xhr) {};
+
+  var mtlLoader = new THREE.MTLLoader();
+  mtlLoader.setPath('models/');
+  mtlLoader.load(modelName+'.mtl', function(materials) {
+
+    materials.preload();
+
+    var objLoader = new THREE.OBJLoader();
+    objLoader.setMaterials(materials);
+    objLoader.setPath('models/');
+    objLoader.load(modelName+'.obj', function(object) {
+    
+     bus =  unitize (object, targetSize);
+    //theObject.add ( new THREE.BoxHelper (theObject) )
+    bus.name = 'OBJ'
+    scene.add (bus);
+    
+    bus.setRotationFromEuler (new THREE.Euler (3.1416/2, 0, -3.1416/2, 'XYZ'))
+    bus.rotation.z += Math.PI/2;
+    bus.rotation.x += -Math.PI/2;
+    //bus.rotation.y += Math.PI/2;
+
+    }, onProgress, onError);
+
+  });
+
+}
+function unitize (object, targetSize) {  
+  
+  // find bounding box of 'object'
+  var box3 = new THREE.Box3();
+  box3.setFromObject (object);
+  var size = new THREE.Vector3();
+  size.subVectors (box3.max, box3.min);
+  var center = new THREE.Vector3();
+  center.addVectors(box3.max, box3.min).multiplyScalar (0.5);
+  
+  console.log ('center: ' + center.x + ', '+center.y + ', '+center.z );
+  console.log ('size: ' + size.x + ', ' +  size.y + ', '+size.z );
+  
+  // uniform scaling according to objSize
+  var objSize = Math.max (size.x, size.y, size.z);
+  var scaleSet = targetSize/objSize;
+        
+  var theObject =  new THREE.Object3D();
+  theObject.add (object);
+  object.scale.set (scaleSet, scaleSet, scaleSet);
+  object.position.set (-center.x*scaleSet, -center.y*scaleSet, -center.z*scaleSet);
+  
+  return theObject;
+      
+}
+function animate() {
+  let dt = clock.getDelta();
+
+  requestAnimationFrame(animate);
+  render();
+
+  if(bus != undefined)
+  {  
+    if(count==0){
+     agent = new Agent(new THREE.Vector3(100,25,0),bus);
+     count=1;
+   }
+   man.update(dt); 
+   agent.update(dt);
+  }
+  
+}
+
+function onDocumentMouseDown(event) {
+
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables);
+  if (intersects.length > 0) {
+    targetMesh.position.copy(intersects[0].point);
+    targetMesh.position.y = 0.15
+    agent.setTarget (intersects[0].point.x,16, intersects[0].point.z);
+  }
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+
+</script>
+
+</body>
+</html>
