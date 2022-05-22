@@ -78,6 +78,7 @@ function init() {
   var floor = new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),new THREE.MeshPhongMaterial({color: 0x696969,shininess: 10,side:THREE.DoubleSide,}))
   floor.rotation.x = -Math.PI/2;
   scene.add(floor);
+  //floor.visible=false;
   pickables = [floor];
 
 

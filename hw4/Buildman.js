@@ -150,7 +150,7 @@ update(dt){
 
   setTarget(x,y,z) {
     if (this.target !== null)
-      this.target.copy(agent.model.localToWorld(new THREE.Vector3(35,-25,-4)));
+      this.target.copy(agent.model.localToWorld(new THREE.Vector3(0,0,0)));
     else {
       this.target = new THREE.Vector3(x,y,z);
     }

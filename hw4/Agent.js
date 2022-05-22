@@ -40,7 +40,7 @@ class Agent {
     // for orientable agent
     // non PD version
     if (this.vel.length() > 0.1) {
-        this.angle = Math.atan2 (-this.vel.z, this.vel.x)
+        this.angle = Math.atan2 (this.vel.x, this.vel.z)
         this.model.rotation.y = this.angle
         console.log(this.angle);
 
