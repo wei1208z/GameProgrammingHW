@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html><head>
+<style>
+
+	#info {
+    position: absolute;
+    top: 0px;
+    width: 100%;
+    padding: 5px;
+    text-align: center;
+    color: #ffff00
+  }
+  body {
+    background-color: #fff;
+    color: #111;
+    margin: 0px;
+    overflow: hidden;
+  font-family: Monospace;
+    font-size: 20px;
+  }
+</style>
+<style></style></head>
+
+<body> 
+<div id="info">
+  <h1>HW5 AirHocky</h1> <br>
+  press "space" to reset the puck<br><br>
+  Score：<span id="score">0</span>
+</div>
+
+<audio id="hgoal" style="display:none">
+    <source src="./hitgoal.mp3" type="audio/wav">
+</audio>
+
+<audio id="hit" style="display:none">
+<source src="./hit.wav" type='audio/wav'>
+</audio>
+
+
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://jyunming-chen.github.io/game3js/js/ccdsys.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+
+<script>
+var scene, renderer, camera;
+var keyboard = new KeyboardState();
+var raycaster;
+var mouse = new THREE.Vector2();
+var pickables = [];
+
+var target=[];
+var listener, bgm;
+var score = 0;
+/////////////////////////
+var twoLinkArm;
+var end;
+var endPos, lastPos;
+
+
+
+r = 10;
+
+var puck = {
+  pos: new THREE.Vector3(),
+    vel: new THREE.Vector3(),
+    isBound:false,
+    
+    init: function () {
+      this.mesh = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 5, 64), 
+                new THREE.MeshNormalMaterial());
+      this.pos.set (0,0,60);
+      this.mesh.position.copy (this.pos);      
+    },
+    update: function(dt) {
+        this.pos.add (this.vel.clone().multiplyScalar(dt));
+        this.vel.multiplyScalar (0.98);  // damp to ZERO
+
+        this.mesh.position.copy (this.pos);
+    }
+}
+
+
+class Wall{
+  constructor(len,i){
+    var geometry = new THREE.BoxGeometry(400,10,10);
+    var material = new THREE.MeshPhongMaterial({color: 0xADADAD,shininess: 200,transparent:true,opacity:0.5})
+    var mesh = new THREE.Mesh(geometry,material);
+    
+    if(i == 0)  mesh.position.set(0,5,(len+5));
+    if(i == 1)  mesh.position.set(0,5,-(len+5));
+    if(i > 1)   mesh.rotation.y = Math.PI / 2;
+    if(i == 2)  mesh.position.set((len+5),5,0);
+    if(i == 3)  mesh.position.set(-(len+5),5,0);
+
+    return mesh;
+  }
+}
+
+
+
+var twoLinker = {  
+    theta1: 0,
+    theta2: 0,
+    target: new THREE.Vector3(),
+
+  init: function() {
+      let twoLinkArm = new THREE.Object3D();
+
+    this.link1 = makeLink (60)
+      this.link2 = makeLink (90)
+
+    twoLinkArm.add (this.link1);
+      this.link1.add (this.link2);
+      this.link2.position.set (60,0,0);
+
+      // base
+      let cyl_geom = new THREE.CylinderGeometry(5, 5, 6, 32);
+      let cyl_mat = new THREE.MeshBasicMaterial({
+        color: 0xff2211
+      });
+      let base = new THREE.Mesh(cyl_geom, cyl_mat);
+      twoLinkArm.add(base);
+    
+    return twoLinkArm;    
+    },
+
+  // ccdSys: to be added later
+
+  update: function (thetas) { // pass jointAngleArray
+      this.theta1 = thetas[0]
+        this.theta2 = thetas[1]
+    this.link1.rotation.y = this.theta1;
+      this.link2.rotation.y = this.theta2;    
+    }
+
+}
+
+
+init();
+animate();
+
+
+////////////////////////////////////////////////////////////////
+function init() {
+  walls = new THREE.Group();
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+  camera.position.set (0,500,400);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  document.body.appendChild(renderer.domElement);
+
+  let spotLight = new THREE.SpotLight(0xffffff);
+  spotLight.position.set( 0, 800, 200 );
+  scene.add(spotLight);
+
+
+  /////////////////////////////////////////////////////////////////////
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshPhongMaterial({color: 0x5B5B5B,shininess: 200,side:THREE.DoubleSide,}))
+  floor.rotation.x = -Math.PI/2;
+  scene.add(floor);
+  pickables = [floor];
+  raycaster = new THREE.Raycaster();
+  document.addEventListener('mousemove', onDocumentMouseMove, false);
+  hit = document.getElementById('hit');
+  hgoal = document.getElementById('hgoal');
+
+  var goal = new THREE.Mesh(new THREE.BoxGeometry(60,10,10) ,new THREE.MeshPhongMaterial({color:0xFFD306,shininess: 200,transparent: true, opacity:1}));
+  goal.position.set  (0,5,-205);
+  scene.add(goal);
+
+  /////////////////////////////////////////////
+  puck.init();
+  twoLinkArm = twoLinker.init();
+  scene.add (puck.mesh, twoLinkArm);  
+  
+  end = new THREE.Mesh (new THREE.CylinderGeometry (20,20,5,64), new THREE.MeshBasicMaterial({color:'green'})); 
+  scene.add (end);
+  endPos = new THREE.Vector3();
+  lastPos = new THREE.Vector3();
+  
+  twoLinkArm.position.set (0,0,50);
+  
+  // setting ccdSys
+  twoLinker.ccdSys = new CCDSys (fk)
+  
+  // axes are in local frame of twolink arm
+  twoLinker.ccdSys.setCCDAxis (new THREE.Vector3(0,1,0), 0)
+  twoLinker.ccdSys.setCCDAxis (new THREE.Vector3(0,1,0), 1, -3.1, -0.01)  
+  //Addwalls();
+  window.addEventListener('resize', onWindowResize, false);
+
+  ////////////////
+  for(var i = 0; i < 4; i++){
+    walls.add(new Wall(400/2,i));
+  }
+  scene.add(walls);
+}
+
+
+
+function hitwall(){
+	if(puck.pos.x > 180){
+			hit.play();
+			puck.vel.x = -puck.vel.x;
+			puck.pos.x = 180;
+		}		
+		if(puck.pos.x < -180){
+			hit.play();
+			puck.vel.x = -puck.vel.x;
+			puck.pos.x = -180;
+		}		
+		if(puck.pos.z > 180){
+			hit.play();
+			puck.vel.z = -puck.vel.z;
+			puck.pos.z = 180;
+		}
+		if(puck.pos.z < -180){
+			hit.play();
+			puck.vel.z = -puck.vel.z;
+			puck.pos.z = -180;
+		}
+
+    if(end.position.x > 180){
+      end.position.x = 180;
+    }   
+    if(end.position.x < -180){
+      end.position.x = -180;
+    }   
+    if(end.position.z > 180){
+      end.position.z = 180;
+    }
+    if(end.position.z < -180){
+      end.position.z = -180;
+    }   
+}
+check == 0;
+function hitgoal(){
+    //console.log (puck.pos);
+    //if (puck.pos.clone().sub(target[0].point).dot(target[0].normal) < Wall2.eps + r) {
+    if ((puck.pos.x > -30 && puck.pos.x<30) && (puck.pos.z < -170 && puck.pos.z >-190)) {
+    
+    if(check == 0)
+      score = score + 1;
+    check=1;
+    document.getElementById('score').innerHTML = score;
+    isBound(true);
+    }  
+    else{
+      check=0;
+    }
+}
+
+function isBound(p){
+    if (p) {
+    hgoal.play();
+  }
+}
+
+function animate() {
+  
+  let dt = 0.1;
+  // collision detection
+  if (endPos.distanceTo (puck.pos) <40) {
+     console.log ('hit');
+     puck.vel.copy (endPos.clone().sub(lastPos).divideScalar(dt));
+     hit.play();
+      //aud.play(0);
+     
+  }
+
+  lastPos.copy (endPos);  
+  puck.update (0.1);
+
+  
+  hitwall();
+  hitgoal();
+  requestAnimationFrame(animate);
+  update()
+  render();
+}
+
+function update() {
+
+  keyboard.update();
+  if (keyboard.pressed("space"))
+  {
+    puck.pos.set (0,0,60);
+    puck.vel.set (0,0,0);
+  }
+  
+  twoLinkArm.position.set (0, 0, 150);
+  
+  var thetas = [twoLinker.theta1, twoLinker.theta2];
+  
+  // target is set by mousedown callback
+  twoLinker.ccdSys.solve (twoLinker.target, thetas);
+  twoLinker.update (thetas);
+
+}
+////////////////////////////////////////////////////////
+// forward kinematics
+function fk (theta, joints) {  // all memory assumed in place
+  joints[0].set (0,0,0);
+  
+  var localzero = new THREE.Vector3(0, 0, 0);
+  var m = new THREE.Matrix4();
+  m.makeRotationY(theta[0]);
+  m.multiply(new THREE.Matrix4().makeTranslation(60, 0, 0));
+  localzero.applyMatrix4(m);
+  joints[1].copy(localzero);
+
+  localzero.set(0, 0, 0);
+  m.multiply(new THREE.Matrix4().makeRotationY(theta[1]));
+  m.multiply(new THREE.Matrix4().makeTranslation(90, 0, 0));
+  localzero.applyMatrix4(m);
+  joints[2].copy(localzero);
+  
+}
+
+function onDocumentMouseMove (event) {
+
+  event.preventDefault();
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // find intersections
+  raycaster.setFromCamera(mouse, camera);
+  var intersects = raycaster.intersectObjects(pickables);
+
+  if (intersects.length > 0) {    
+    twoLinker.target.copy ( twoLinkArm.worldToLocal (intersects[0].point) )  
+  }
+
+}
+
+function makeLink(length) {
+  var oneLink = new THREE.Object3D();
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(length, 10,10), new THREE.MeshNormalMaterial());
+  oneLink.add(mesh);
+  mesh.position.set(length/2, 0, 0);
+  return oneLink;
+}
+
+function onWindowResize() {
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+
+function render() {
+
+  renderer.render(scene, camera);
+
+  endPos.copy (twoLinkArm.children[0].children[1].localToWorld(new THREE.Vector3(90,0,0)));
+  
+  end.position.copy (endPos);
+}
+
+</script>
+
+
+</body></html>
